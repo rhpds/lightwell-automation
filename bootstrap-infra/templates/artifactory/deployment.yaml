@@ -33,6 +33,10 @@ spec:
         app: artifactory
     spec:
       serviceAccountName: artifactory
+      securityContext:
+        runAsUser: 1030
+        runAsGroup: 1030
+        fsGroup: 1030
       initContainers:
         - name: seed-config
           image: busybox:1.36

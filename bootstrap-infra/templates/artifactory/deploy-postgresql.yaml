@@ -16,16 +16,20 @@ spec:
       labels:
         name: artifactory-postgresql
     spec:
+      securityContext:
+        fsGroup: 999
       containers:
         - name: postgresql
           image: {{ .Values.artifactory.postgresqlImage }}
           env:
-            - name: POSTGRESQL_USER
+            - name: POSTGRES_USER
               value: artifactory
-            - name: POSTGRESQL_PASSWORD
+            - name: POSTGRES_PASSWORD
               value: artpass
-            - name: POSTGRESQL_DATABASE
+            - name: POSTGRES_DB
               value: artifactory
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           ports:
             - containerPort: 5432
               name: postgres
@@ -35,17 +39,17 @@ spec:
               memory: 512Mi
           livenessProbe:
             exec:
-              command: [pg_isready, -h, localhost, -U, postgres]
+              command: [pg_isready, -h, localhost, -U, artifactory]
             initialDelaySeconds: 30
             timeoutSeconds: 5
           readinessProbe:
             exec:
-              command: [pg_isready, -h, localhost, -U, postgres]
+              command: [pg_isready, -h, localhost, -U, artifactory]
             initialDelaySeconds: 5
             timeoutSeconds: 5
             failureThreshold: 6
           volumeMounts:
-            - mountPath: /var/lib/pgsql/data
+            - mountPath: /var/lib/postgresql/data
               name: data
       volumes:
         - name: data

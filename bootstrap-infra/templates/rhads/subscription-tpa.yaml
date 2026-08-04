@@ -1,8 +1,19 @@
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: rhtpa-operator-group
+  namespace: {{ .Values.tpa.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  targetNamespaces:
+    - {{ .Values.tpa.namespace }}
+---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: rhtpa-operator
-  namespace: openshift-operators
+  namespace: {{ .Values.tpa.namespace }}
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: lightwell-tenant
+description: Lightwell demo per-user tenant resources (placeholder)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

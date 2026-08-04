@@ -1,0 +1,34 @@
+deployer:
+  domain: apps.cluster-guid.sandbox.opentlc.com
+
+admin:
+  password: changeme
+
+gitlab:
+  namespace: gitlab
+  image: quay.io/redhat-gpte/gitlab:17.4.1
+  postgresqlImage: quay.io/redhat-gpte/gitlab-postgresql:14
+  redisImage: redis:6.2.6
+  rootPassword: changeme
+  repos: []
+
+rhtas:
+  namespace: lightwell-tas
+  channel: stable-v1.3
+
+tpa:
+  namespace: lightwell-tpa
+  channel: stable-v1.1
+
+artifactory:
+  namespace: lightwell-artifactory
+  image: releases-docker.jfrog.io/jfrog/artifactory-oss:7.98.14
+  storageSize: 20Gi
+
+jenkins:
+  namespace: lightwell-jenkins
+  image: registry.redhat.io/ocp-tools-4/jenkins-rhel9:v4.17.0-1750853657
+  password: changeme
+  storageSize: 20Gi
+
+jobAnsibleImage: quay.io/agnosticd/ee-multicloud:latest

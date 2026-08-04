@@ -1,3 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: artifactory-system-yaml
+  namespace: {{ .Values.artifactory.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  system.yaml: |
+    shared:
+      database:
+        type: postgresql
+        driver: org.postgresql.Driver
+        url: jdbc:postgresql://artifactory-postgresql:5432/artifactory
+        username: artifactory
+        password: artpass
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,7 +33,7 @@ spec:
         app: artifactory
     spec:
       initContainers:
-        - name: seed-keys
+        - name: seed-config
           image: busybox:1.36
           command:
             - sh
@@ -26,11 +43,15 @@ spec:
               cp /secrets/master.key /var/opt/jfrog/artifactory/etc/security/master.key
               cp /secrets/join.key /var/opt/jfrog/artifactory/etc/security/join.key
               chmod 600 /var/opt/jfrog/artifactory/etc/security/*.key
+              cp /config/system.yaml /var/opt/jfrog/artifactory/etc/system.yaml
           volumeMounts:
             - name: artifactory-data
               mountPath: /var/opt/jfrog/artifactory
             - name: keys
               mountPath: /secrets
+              readOnly: true
+            - name: config
+              mountPath: /config
               readOnly: true
       containers:
         - name: artifactory
@@ -73,3 +94,6 @@ spec:
         - name: keys
           secret:
             secretName: artifactory-keys
+        - name: config
+          configMap:
+            name: artifactory-system-yaml

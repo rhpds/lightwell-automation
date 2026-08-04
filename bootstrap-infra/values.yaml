@@ -24,6 +24,7 @@ tpa:
 artifactory:
   namespace: lightwell-artifactory
   image: releases-docker.jfrog.io/jfrog/artifactory-oss:7.98.14
+  postgresqlImage: registry.redhat.io/rhel9/postgresql-16:1-75.1719560667
   storageSize: 20Gi
 
 jenkins:

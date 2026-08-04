@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: artifactory-postgresql
+  namespace: {{ .Values.artifactory.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  selector:
+    matchLabels:
+      name: artifactory-postgresql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        name: artifactory-postgresql
+    spec:
+      containers:
+        - name: postgresql
+          image: {{ .Values.artifactory.postgresqlImage }}
+          env:
+            - name: POSTGRESQL_USER
+              value: artifactory
+            - name: POSTGRESQL_PASSWORD
+              value: artpass
+            - name: POSTGRESQL_DATABASE
+              value: artifactory
+          ports:
+            - containerPort: 5432
+              name: postgres
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+          livenessProbe:
+            exec:
+              command: [pg_isready, -h, localhost, -U, postgres]
+            initialDelaySeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command: [pg_isready, -h, localhost, -U, postgres]
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - mountPath: /var/lib/pgsql/data
+              name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: artifactory-postgresql

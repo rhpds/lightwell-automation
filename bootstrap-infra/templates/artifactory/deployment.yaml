@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: artifactory
+  namespace: {{ .Values.artifactory.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: artifactory
+  template:
+    metadata:
+      labels:
+        app: artifactory
+    spec:
+      containers:
+        - name: artifactory
+          image: {{ .Values.artifactory.image }}
+          ports:
+            - containerPort: 8081
+              name: http
+            - containerPort: 8082
+              name: router
+          env:
+            - name: JF_ROUTER_ENTRYPOINTS_EXTERNALPORT
+              value: "8082"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              memory: 4Gi
+          volumeMounts:
+            - name: artifactory-data
+              mountPath: /var/opt/jfrog/artifactory
+          readinessProbe:
+            httpGet:
+              path: /router/api/v1/system/readiness
+              port: 8082
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /router/api/v1/system/liveness
+              port: 8082
+            initialDelaySeconds: 90
+            periodSeconds: 10
+      volumes:
+        - name: artifactory-data
+          persistentVolumeClaim:
+            claimName: artifactory-data

@@ -15,6 +15,23 @@ spec:
       labels:
         app: artifactory
     spec:
+      initContainers:
+        - name: seed-keys
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /var/opt/jfrog/artifactory/etc/security
+              cp /secrets/master.key /var/opt/jfrog/artifactory/etc/security/master.key
+              cp /secrets/join.key /var/opt/jfrog/artifactory/etc/security/join.key
+              chmod 600 /var/opt/jfrog/artifactory/etc/security/*.key
+          volumeMounts:
+            - name: artifactory-data
+              mountPath: /var/opt/jfrog/artifactory
+            - name: keys
+              mountPath: /secrets
+              readOnly: true
       containers:
         - name: artifactory
           image: {{ .Values.artifactory.image }}
@@ -39,15 +56,20 @@ spec:
             httpGet:
               path: /router/api/v1/system/readiness
               port: 8082
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 10
+            failureThreshold: 10
           livenessProbe:
             httpGet:
               path: /router/api/v1/system/liveness
               port: 8082
-            initialDelaySeconds: 90
+            initialDelaySeconds: 180
             periodSeconds: 10
+            failureThreshold: 10
       volumes:
         - name: artifactory-data
           persistentVolumeClaim:
             claimName: artifactory-data
+        - name: keys
+          secret:
+            secretName: artifactory-keys

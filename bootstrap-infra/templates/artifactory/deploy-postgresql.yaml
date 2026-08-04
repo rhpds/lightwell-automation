@@ -15,7 +15,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  system:openshift:scc:anyuid
+  name: "system:openshift:scc:anyuid"
 subjects:
   - kind: ServiceAccount
     name: artifactory-postgresql

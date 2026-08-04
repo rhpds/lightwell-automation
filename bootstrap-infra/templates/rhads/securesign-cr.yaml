@@ -12,6 +12,9 @@ spec:
   fulcio:
     externalAccess:
       enabled: true
+    certificate:
+      organizationName: RedHat
+      organizationEmail: lightwell@redhat.com
     config:
       OIDCIssuers:
         - ClientID: "trusted-artifact-signer"

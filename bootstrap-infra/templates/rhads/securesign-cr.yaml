@@ -1,0 +1,27 @@
+apiVersion: rhtas.redhat.com/v1alpha1
+kind: Securesign
+metadata:
+  name: securesign-sample
+  namespace: {{ .Values.rhtas.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  rekor:
+    externalAccess:
+      enabled: true
+  fulcio:
+    externalAccess:
+      enabled: true
+    config:
+      OIDCIssuers:
+        - ClientID: "trusted-artifact-signer"
+          IssuerURL: "https://keycloak-keycloak.{{ .Values.deployer.domain }}/realms/trusted-artifact-signer"
+          Issuer: "https://keycloak-keycloak.{{ .Values.deployer.domain }}/realms/trusted-artifact-signer"
+          Type: email
+  ctlog: {}
+  tuf:
+    externalAccess:
+      enabled: true
+  trillian:
+    database:
+      create: true

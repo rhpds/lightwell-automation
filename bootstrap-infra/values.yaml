@@ -1,5 +1,6 @@
 deployer:
   domain: apps.cluster-guid.sandbox.opentlc.com
+  storageClass: ocs-external-storagecluster-ceph-rbd-immediate
 
 admin:
   password: changeme

@@ -6,6 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
+  storageClassName: {{ .Values.deployer.storageClass }}
   accessModes:
     - ReadWriteOnce
   resources:

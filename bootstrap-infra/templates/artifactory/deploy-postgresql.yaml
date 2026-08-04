@@ -1,3 +1,26 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: artifactory-postgresql
+  namespace: {{ .Values.artifactory.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:openshift:scc:anyuid-artifactory-pg
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: artifactory-postgresql
+    namespace: {{ .Values.artifactory.namespace }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,8 +39,7 @@ spec:
       labels:
         name: artifactory-postgresql
     spec:
-      securityContext:
-        fsGroup: 999
+      serviceAccountName: artifactory-postgresql
       containers:
         - name: postgresql
           image: {{ .Values.artifactory.postgresqlImage }}

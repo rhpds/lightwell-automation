@@ -32,6 +32,7 @@ spec:
       labels:
         app: artifactory
     spec:
+      serviceAccountName: artifactory
       initContainers:
         - name: seed-config
           image: busybox:1.36

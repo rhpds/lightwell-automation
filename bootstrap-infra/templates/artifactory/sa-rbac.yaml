@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: artifactory
+  namespace: {{ .Values.artifactory.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:openshift:scc:anyuid-artifactory
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: artifactory
+    namespace: {{ .Values.artifactory.namespace }}

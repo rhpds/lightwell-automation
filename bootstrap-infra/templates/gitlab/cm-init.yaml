@@ -1,0 +1,164 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-init-gitlab
+  namespace: {{ .Values.gitlab.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+data:
+  playbook.yaml: |
+    ---
+    - name: Configure GitLab
+      hosts: localhost
+      vars:
+        gitlab_namespace: {{ .Values.gitlab.namespace }}
+        gitlab_host: gitlab-{{ .Values.gitlab.namespace }}.{{ .Values.deployer.domain }}
+        root_password: {{ .Values.gitlab.rootPassword }}
+        cluster_subdomain: {{ .Values.deployer.domain }}
+      tasks:
+        - name: Wait for GitLab pod to be ready
+          kubernetes.core.k8s_info:
+            kind: Pod
+            namespace: '{{ "{{" }} gitlab_namespace {{ "}}" }}'
+            label_selectors:
+              - app=gitlab
+          register: r_gitlab_pod
+          retries: 120
+          delay: 10
+          until:
+            - r_gitlab_pod.resources is defined
+            - r_gitlab_pod.resources | length > 0
+            - r_gitlab_pod.resources[0].status is defined
+            - r_gitlab_pod.resources[0].status.phase == 'Running'
+            - r_gitlab_pod.resources[0].status.containerStatuses is defined
+            - r_gitlab_pod.resources[0].status.containerStatuses | selectattr('ready', 'equalto', true) | list | length == r_gitlab_pod.resources[0].status.containerStatuses | length
+
+        - name: Wait for GitLab API to be available
+          ansible.builtin.uri:
+            url: https://{{ "{{" }} gitlab_host {{ "}}" }}/api/v4/projects
+            method: GET
+            validate_certs: false
+          register: r_liveness
+          retries: 60
+          delay: 10
+          until: r_liveness.status == 200
+
+        - name: Seed root user if not present
+          shell: |
+            POD=$(oc get pod -l app=gitlab -n {{ "{{" }} gitlab_namespace {{ "}}" }} --no-headers | awk '{print $1}')
+            oc exec $POD -n {{ "{{" }} gitlab_namespace {{ "}}" }} -- /bin/sh -c 'echo "
+              u = User.find_by(username: \"root\")
+              unless u
+                u = User.new(username: \"root\", email: \"root@rhdemo.com\", name: \"Administrator\", password: \"{{ "{{" }} root_password {{ "}}" }}\", password_confirmation: \"{{ "{{" }} root_password {{ "}}" }}\", admin: true)
+                u.skip_confirmation!
+                u.save!(validate: false)
+                n = u.create_namespace!(path: \"root\", name: \"Root\", owner: u)
+                puts \"ROOT_CREATED id=#{u.id}\"
+              else
+                puts \"ROOT_EXISTS id=#{u.id}\"
+              end
+            " | timeout 120 ./bin/rails console'
+          register: r_seed_root
+          retries: 3
+          delay: 30
+          until: r_seed_root.rc == 0 and 'ROOT_CREATED' in r_seed_root.stdout or 'ROOT_EXISTS' in r_seed_root.stdout
+
+        - name: Generate root user personal token
+          shell: |
+            POD=$(oc get pod -l app=gitlab -n {{ "{{" }} gitlab_namespace {{ "}}" }} --no-headers | awk '{print $1}')
+            oc exec $POD -n {{ "{{" }} gitlab_namespace {{ "}}" }} -- /bin/sh -c /scripts/create-root-pat.sh
+            ROOT_PAT=$(oc exec $POD -n {{ "{{" }} gitlab_namespace {{ "}}" }} -- /bin/sh -c "cat /tmp/root.pat")
+            oc delete secret root-user-personal-token -n {{ "{{" }} gitlab_namespace {{ "}}" }} --ignore-not-found
+            oc create secret generic root-user-personal-token --from-literal=token=$ROOT_PAT -n {{ "{{" }} gitlab_namespace {{ "}}" }}
+          retries: 3
+          delay: 30
+          register: r_create_pat
+          until: r_create_pat.rc == 0
+
+        - name: Retrieve root token
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Secret
+            name: root-user-personal-token
+            namespace: '{{ "{{" }} gitlab_namespace {{ "}}" }}'
+          register: r_root_token
+          failed_when: r_root_token.resources[0].data.token | length == 0
+
+        - name: Decode root token
+          set_fact:
+            root_token: '{{ "{{" }} r_root_token.resources[0].data.token | b64decode {{ "}}" }}'
+
+        - name: Update application settings
+          ansible.builtin.uri:
+            url: https://{{ "{{" }} gitlab_host {{ "}}" }}/api/v4/application/settings
+            method: PUT
+            body_format: form-urlencoded
+            body:
+              import_sources: "git,github,gitea"
+              version_check_enabled: "false"
+              allow_local_requests_from_web_hooks_and_services: "true"
+            headers:
+              PRIVATE-TOKEN: '{{ "{{" }} root_token {{ "}}" }}'
+            validate_certs: false
+            status_code: 200
+          retries: 10
+          delay: 5
+          register: r_application_settings
+          until: r_application_settings.status == 200
+
+        - name: Create lightwell group
+          ansible.builtin.uri:
+            url: https://{{ "{{" }} gitlab_host {{ "}}" }}/api/v4/groups
+            method: POST
+            body_format: json
+            body:
+              name: lightwell
+              path: lightwell
+              visibility: public
+            headers:
+              PRIVATE-TOKEN: '{{ "{{" }} root_token {{ "}}" }}'
+            validate_certs: false
+            status_code: [201, 400]
+
+        - name: Get lightwell group id
+          ansible.builtin.uri:
+            url: https://{{ "{{" }} gitlab_host {{ "}}" }}/api/v4/groups/lightwell
+            method: GET
+            headers:
+              PRIVATE-TOKEN: '{{ "{{" }} root_token {{ "}}" }}'
+            validate_certs: false
+          register: r_lightwell_group
+
+{{- range .Values.gitlab.repos }}
+
+        - name: Import {{ .name }} repo
+          ansible.builtin.uri:
+            url: https://{{ "{{" }} gitlab_host {{ "}}" }}/api/v4/projects
+            method: POST
+            body_format: json
+            body:
+              name: {{ .name }}
+              namespace_id: '{{ "{{" }} r_lightwell_group.json.id {{ "}}" }}'
+              import_url: {{ .sourceUrl }}
+              visibility: public
+            headers:
+              PRIVATE-TOKEN: '{{ "{{" }} root_token {{ "}}" }}'
+            validate_certs: false
+            status_code: [201, 400]
+          retries: 5
+          delay: 15
+          register: r_create_{{ .name | replace "-" "_" }}
+          until: r_create_{{ .name | replace "-" "_" }}.status in [201, 400]
+
+        - name: Wait for {{ .name }} import to finish
+          ansible.builtin.uri:
+            url: https://{{ "{{" }} gitlab_host {{ "}}" }}/api/v4/projects/lightwell%2F{{ .name }}
+            method: GET
+            headers:
+              PRIVATE-TOKEN: '{{ "{{" }} root_token {{ "}}" }}'
+            validate_certs: false
+          register: r_import_{{ .name | replace "-" "_" }}
+          retries: 30
+          delay: 10
+          until: r_import_{{ .name | replace "-" "_" }}.json.import_status is not defined or r_import_{{ .name | replace "-" "_" }}.json.import_status in ['finished', 'none']
+{{- end }}

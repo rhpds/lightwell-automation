@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab-postgresql
+  namespace: {{ .Values.gitlab.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  selector:
+    matchLabels:
+      name: gitlab-postgresql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        name: gitlab-postgresql
+    spec:
+      serviceAccountName: gitlab
+      containers:
+        - name: postgresql
+          image: {{ .Values.gitlab.postgresqlImage }}
+          env:
+            - name: DB_USER
+              value: gitlab
+            - name: DB_PASS
+              value: passw0rd
+            - name: DB_NAME
+              value: gitlab_production
+            - name: DB_EXTENSION
+              value: pg_trgm,btree_gist
+          ports:
+            - containerPort: 5432
+              name: postgres
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+          securityContext:
+            privileged: true
+          livenessProbe:
+            exec:
+              command: [pg_isready, -h, localhost, -U, postgres]
+            initialDelaySeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command: [pg_isready, -h, localhost, -U, postgres]
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - mountPath: /var/lib/postgresql
+              name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: gitlab-postgresql

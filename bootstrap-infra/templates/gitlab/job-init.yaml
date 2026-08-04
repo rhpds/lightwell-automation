@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: initialize-gitlab
+  namespace: {{ .Values.gitlab.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  backoffLimit: 100
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: gitlab
+      containers:
+        - name: initialize-gitlab
+          image: {{ .Values.jobAnsibleImage }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -x
+              ansible-playbook -i localhost /scripts/playbook.yaml
+          volumeMounts:
+            - mountPath: /scripts
+              name: init-gitlab-vol
+      volumes:
+        - name: init-gitlab-vol
+          configMap:
+            name: cm-init-gitlab

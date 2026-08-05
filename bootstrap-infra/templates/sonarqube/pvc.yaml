@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sonarqube-data
+  namespace: {{ .Values.sonarqube.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  storageClassName: {{ .Values.deployer.storageClass }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.sonarqube.storageSize }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sonarqube-postgresql
+  namespace: {{ .Values.sonarqube.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  storageClassName: {{ .Values.deployer.storageClass }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

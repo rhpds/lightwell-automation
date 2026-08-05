@@ -15,7 +15,7 @@ gitlab:
 
 rhtas:
   namespace: lightwell-tas
-  channel: stable-v1.3
+  channel: stable-v1.4
 
 tpa:
   namespace: lightwell-tpa

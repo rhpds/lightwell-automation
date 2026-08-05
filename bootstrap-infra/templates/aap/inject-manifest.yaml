@@ -1,0 +1,128 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aap-manifest-injector
+  namespace: {{ .Values.aap.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: aap-manifest-injector
+  namespace: {{ .Values.aap.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+rules:
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: aap-manifest-injector
+  namespace: {{ .Values.aap.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: aap-manifest-injector
+subjects:
+  - kind: ServiceAccount
+    name: aap-manifest-injector
+    namespace: {{ .Values.aap.namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: inject-aap-manifest
+  namespace: {{ .Values.aap.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      serviceAccountName: aap-manifest-injector
+      restartPolicy: OnFailure
+      containers:
+        - name: inject
+          image: {{ .Values.jobAnsibleImage }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              NAMESPACE="{{ .Values.aap.namespace }}"
+              ADMIN_USER="admin"
+              ADMIN_PASS="{{ .Values.admin.password }}"
+              MANIFEST_URL="{{ .Values.aap.manifestUrl }}"
+
+              # Discover the controller route
+              echo "Waiting for AAP Controller route..."
+              CONTROLLER_HOST=""
+              for i in $(seq 1 60); do
+                ROUTE_HOST=$(oc get route -n "${NAMESPACE}" \
+                  -l app.kubernetes.io/component=controller \
+                  -o jsonpath='{.items[0].spec.host}' 2>/dev/null)
+                if [ -n "${ROUTE_HOST}" ]; then
+                  CONTROLLER_HOST="https://${ROUTE_HOST}"
+                  echo "Found controller route: ${CONTROLLER_HOST}"
+                  break
+                fi
+                echo "Attempt $i/60 - waiting for route (10s)..."
+                sleep 10
+              done
+
+              if [ -z "${CONTROLLER_HOST}" ]; then
+                echo "ERROR: Controller route not found after 10 minutes"
+                exit 1
+              fi
+
+              # Wait for controller API to respond
+              echo "Waiting for Controller API..."
+              for i in $(seq 1 60); do
+                STATUS=$(curl -sk -o /dev/null -w '%{http_code}' \
+                  -u "${ADMIN_USER}:${ADMIN_PASS}" \
+                  "${CONTROLLER_HOST}/api/v2/ping/" 2>/dev/null)
+                if [ "${STATUS}" = "200" ]; then
+                  echo "Controller API is ready"
+                  break
+                fi
+                echo "Attempt $i/60 - API returned ${STATUS} (10s)..."
+                sleep 10
+              done
+
+              if [ "${STATUS}" != "200" ]; then
+                echo "ERROR: Controller API not ready after 10 minutes"
+                exit 1
+              fi
+
+              # Download manifest
+              echo "Downloading manifest from ${MANIFEST_URL}..."
+              curl -sL -o /tmp/manifest.zip "${MANIFEST_URL}"
+              if [ ! -s /tmp/manifest.zip ]; then
+                echo "ERROR: Failed to download manifest"
+                exit 1
+              fi
+
+              # Encode and inject
+              MANIFEST_B64=$(base64 -w0 /tmp/manifest.zip)
+              RESULT=$(curl -sk -w '\n%{http_code}' \
+                -u "${ADMIN_USER}:${ADMIN_PASS}" \
+                -H "Content-Type: application/json" \
+                -d "{\"eula_accepted\": true, \"manifest\": \"${MANIFEST_B64}\"}" \
+                "${CONTROLLER_HOST}/api/v2/config/")
+              HTTP_CODE=$(echo "${RESULT}" | tail -1)
+              BODY=$(echo "${RESULT}" | head -n -1)
+
+              if [ "${HTTP_CODE}" = "200" ] || [ "${HTTP_CODE}" = "204" ]; then
+                echo "Manifest injected successfully (HTTP ${HTTP_CODE})"
+              else
+                echo "ERROR: Manifest injection failed (HTTP ${HTTP_CODE})"
+                echo "${BODY}"
+                exit 1
+              fi

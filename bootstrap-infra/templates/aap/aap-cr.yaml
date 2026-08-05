@@ -1,0 +1,21 @@
+apiVersion: aap.ansible.com/v1alpha1
+kind: AnsibleAutomationPlatform
+metadata:
+  name: aap
+  namespace: {{ .Values.aap.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  admin_password_secret: aap-admin-password
+  postgres_storage_class: {{ .Values.deployer.storageClass }}
+  controller:
+    disabled: false
+    replicas: 1
+  eda:
+    disabled: false
+    replicas: 1
+  hub:
+    disabled: true
+  lightspeed:
+    disabled: true

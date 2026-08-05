@@ -39,4 +39,9 @@ sonarqube:
   postgresqlImage: docker.io/library/postgres:16-alpine
   storageSize: 10Gi
 
+aap:
+  namespace: aap
+  channel: stable-2.6
+  manifestUrl: https://d3s3zqyaz8cp2d.cloudfront.net/aap/manifest.zip
+
 jobAnsibleImage: quay.io/agnosticd/ee-multicloud:latest

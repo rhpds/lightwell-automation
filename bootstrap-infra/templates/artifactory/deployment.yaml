@@ -13,7 +13,7 @@ data:
         driver: org.postgresql.Driver
         url: jdbc:postgresql://artifactory-postgresql:5432/artifactory
         username: artifactory
-        password: artpass
+        password: {{ .Values.admin.password }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -24,6 +24,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: artifactory

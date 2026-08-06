@@ -6,10 +6,10 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "3"
 spec:
-  backoffLimit: 100
+  backoffLimit: 10
   template:
     spec:
-      restartPolicy: Never
+      restartPolicy: OnFailure
       serviceAccountName: gitlab
       containers:
         - name: initialize-gitlab

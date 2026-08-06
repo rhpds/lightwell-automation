@@ -7,6 +7,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "2"
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: gitlab
@@ -33,6 +35,20 @@ spec:
             requests:
               cpu: 250m
               memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /-/readiness
+              port: 80
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /-/liveness
+              port: 80
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            failureThreshold: 5
           securityContext:
             privileged: true
           volumeMounts:

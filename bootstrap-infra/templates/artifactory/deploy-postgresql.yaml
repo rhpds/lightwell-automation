@@ -47,7 +47,7 @@ spec:
             - name: POSTGRES_USER
               value: artifactory
             - name: POSTGRES_PASSWORD
-              value: artpass
+              value: {{ .Values.admin.password }}
             - name: POSTGRES_DB
               value: artifactory
             - name: PGDATA

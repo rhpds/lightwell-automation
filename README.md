@@ -1,6 +1,6 @@
-# Lightwell Automation
+# Lightwell Automation GitOps
 
-GitOps repository for the **Red Hat Lightwell** trusted software supply chain demo, targeting Summit Connect 2026.
+GitOps repository for the **Red Hat Lightwell** trusted software supply chain demo.
 
 An ArgoCD Application (bootstrapped by the [AgnosticV cluster CI](https://github.com/rhpds/agnosticv)) points at this repo to deploy and manage demo infrastructure on OpenShift.
 
@@ -15,10 +15,14 @@ This demo shows how enterprises integrate Lightwell with their build pipelines t
 ```
 bootstrap-infra/          Helm chart — cluster-scoped shared infrastructure
   templates/
+    aap/                  Ansible Automation Platform (Controller + EDA)
+    argocd/               ArgoCD admin password configuration
+    artifactory/          JFrog Artifactory OSS (proxy to Lightwell Network repos)
     gitlab/               GitLab CE (source code management, CI/CD)
-    rhads/                 RHTAS (Trusted Artifact Signer) + TPA (Trusted Profile Analyzer)
-    artifactory/           JFrog Artifactory OSS (proxy to Lightwell Network repos)
-    jenkins/               Jenkins (build automation)
+    jenkins/              Jenkins (build automation)
+    quay/                 Red Hat Quay (container image registry)
+    rhads/                RHTAS (Trusted Artifact Signer) + TPA (Trusted Profile Analyzer)
+    sonarqube/            SonarQube (static code analysis)
   values.yaml             Configurable values (domain, passwords, image tags, channels)
   Chart.yaml
 
@@ -34,9 +38,12 @@ bootstrap-tenant/         Helm chart — per-user tenant resources (placeholder)
 |-----------|---------|-----------|
 | **GitLab CE** | Source code management and CI/CD pipelines | `gitlab` |
 | **RHTAS** (Trusted Artifact Signer) | Keyless code signing via Sigstore/cosign | `lightwell-tas` |
-| **TPA** (Trusted Profile Analyzer) | SBOM ingestion, vulnerability analysis, VEX | `lightwell-tpa` |
+| **RHTPA** (Trusted Profile Analyzer) | SBOM ingestion, vulnerability analysis, VEX | `lightwell-tpa` |
 | **Artifactory OSS** | Maven/npm proxy to Lightwell Network repositories | `lightwell-artifactory` |
 | **Jenkins** | Build pipeline automation | `lightwell-jenkins` |
+| **SonarQube** | Static code analysis and quality gates | `lightwell-sonarqube` |
+| **Red Hat Quay** | Container image registry with Clair vulnerability scanning | `lightwell-quay` |
+| **AAP** (Ansible Automation Platform) | Automation orchestration and event-driven automation | `aap` |
 
 ## How It's Deployed
 
@@ -63,11 +70,10 @@ ocp4_workload_gitops_bootstrap_helm_values:
 
 ## Key Technologies
 
-- **OpenShift 4.21** — target platform
+- **OpenShift 4.22** — target platform
 - **OpenShift GitOps (ArgoCD)** — app-of-apps deployment
-- **Red Hat Trusted Application Pipelines (RHTAP)** — Tekton-based secure build pipelines
-- **RHTAS** — Sigstore-based artifact signing (cosign, Rekor, Fulcio)
-- **TPA** — Trusted Profile Analyzer (SBOM + vulnerability analysis)
+- **RHTAS** (Red Hat Trusted Artifact Signer) — Sigstore-based artifact signing (cosign, Rekor, Fulcio)
+- **RHTPA** (Red Hat Trusted Profile Analyzer) — SBOM and vulnerability analysis
 - **Ansible Automation Platform** — orchestration (via AgnosticV/AgnosticD)
 
 ## Development

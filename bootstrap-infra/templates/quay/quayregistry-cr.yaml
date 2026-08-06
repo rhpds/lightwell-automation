@@ -9,8 +9,14 @@ metadata:
 spec:
   configBundleSecret: lightwell-quay-config
   components:
+    - kind: quay
+      managed: true
+      overrides:
+        replicas: 1
     - kind: clair
       managed: true
+      overrides:
+        replicas: 1
     - kind: postgres
       managed: true
     - kind: objectstorage

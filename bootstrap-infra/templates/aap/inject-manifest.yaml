@@ -61,33 +61,33 @@ spec:
               ADMIN_PASS="{{ .Values.admin.password }}"
               MANIFEST_URL="{{ .Values.aap.manifestUrl }}"
 
-              # Discover the controller route
-              echo "Waiting for AAP Controller route..."
-              CONTROLLER_HOST=""
+              # Discover the gateway route (AAP 2.5+ proxies controller via gateway)
+              echo "Waiting for AAP Gateway route..."
+              GATEWAY_HOST=""
               for i in $(seq 1 60); do
                 ROUTE_HOST=$(oc get route -n "${NAMESPACE}" \
-                  -l app.kubernetes.io/component=automationcontroller \
+                  -l app.kubernetes.io/managed-by=aap-operator \
                   -o jsonpath='{.items[0].spec.host}' 2>/dev/null)
                 if [ -n "${ROUTE_HOST}" ]; then
-                  CONTROLLER_HOST="https://${ROUTE_HOST}"
-                  echo "Found controller route: ${CONTROLLER_HOST}"
+                  GATEWAY_HOST="https://${ROUTE_HOST}"
+                  echo "Found gateway route: ${GATEWAY_HOST}"
                   break
                 fi
                 echo "Attempt $i/60 - waiting for route (10s)..."
                 sleep 10
               done
 
-              if [ -z "${CONTROLLER_HOST}" ]; then
-                echo "ERROR: Controller route not found after 10 minutes"
+              if [ -z "${GATEWAY_HOST}" ]; then
+                echo "ERROR: Gateway route not found after 10 minutes"
                 exit 1
               fi
 
-              # Wait for controller API to respond
-              echo "Waiting for Controller API..."
+              # Wait for controller API to respond (via gateway proxy)
+              echo "Waiting for Controller API via gateway..."
               for i in $(seq 1 60); do
                 STATUS=$(curl -sk -o /dev/null -w '%{http_code}' \
                   -u "${ADMIN_USER}:${ADMIN_PASS}" \
-                  "${CONTROLLER_HOST}/api/v2/ping/" 2>/dev/null)
+                  "${GATEWAY_HOST}/api/controller/v2/ping/" 2>/dev/null)
                 if [ "${STATUS}" = "200" ]; then
                   echo "Controller API is ready"
                   break
@@ -115,7 +115,7 @@ spec:
                 -u "${ADMIN_USER}:${ADMIN_PASS}" \
                 -H "Content-Type: application/json" \
                 -d "{\"eula_accepted\": true, \"manifest\": \"${MANIFEST_B64}\"}" \
-                "${CONTROLLER_HOST}/api/v2/config/")
+                "${GATEWAY_HOST}/api/controller/v2/config/")
               HTTP_CODE=$(echo "${RESULT}" | tail -1)
               BODY=$(echo "${RESULT}" | head -n -1)
 

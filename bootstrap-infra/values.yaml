@@ -39,6 +39,10 @@ sonarqube:
   postgresqlImage: docker.io/library/postgres:16-alpine
   storageSize: 10Gi
 
+quay:
+  namespace: lightwell-quay
+  channel: stable-3.18
+
 aap:
   namespace: aap
   channel: stable-2.6

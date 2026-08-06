@@ -1,0 +1,84 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-quay-admin
+  namespace: {{ .Values.quay.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      serviceAccountName: quay-init
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: {{ .Values.jobAnsibleImage }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              NAMESPACE="{{ .Values.quay.namespace }}"
+              ADMIN_USER="quayadmin"
+              ADMIN_PASS="{{ .Values.admin.password }}"
+              ADMIN_EMAIL="quayadmin@example.com"
+
+              # Wait for Quay route
+              echo "Waiting for Quay route..."
+              QUAY_HOST=""
+              for i in $(seq 1 60); do
+                ROUTE_HOST=$(oc get route -n "${NAMESPACE}" \
+                  -l quay-operator/quayregistry=lightwell \
+                  -o jsonpath='{.items[0].spec.host}' 2>/dev/null)
+                if [ -n "${ROUTE_HOST}" ]; then
+                  QUAY_HOST="https://${ROUTE_HOST}"
+                  echo "Found Quay route: ${QUAY_HOST}"
+                  break
+                fi
+                echo "Attempt $i/60 - waiting for route (10s)..."
+                sleep 10
+              done
+
+              if [ -z "${QUAY_HOST}" ]; then
+                echo "ERROR: Quay route not found after 10 minutes"
+                exit 1
+              fi
+
+              # Wait for Quay API to respond
+              echo "Waiting for Quay API..."
+              for i in $(seq 1 60); do
+                STATUS=$(curl -sk -o /dev/null -w '%{http_code}' \
+                  "${QUAY_HOST}/health/instance" 2>/dev/null)
+                if [ "${STATUS}" = "200" ]; then
+                  echo "Quay API is ready"
+                  break
+                fi
+                echo "Attempt $i/60 - health returned ${STATUS} (10s)..."
+                sleep 10
+              done
+
+              if [ "${STATUS}" != "200" ]; then
+                echo "ERROR: Quay API not ready after 10 minutes"
+                exit 1
+              fi
+
+              # Initialize admin user via the user initialize API
+              echo "Initializing quayadmin user..."
+              RESULT=$(curl -sk -w '\n%{http_code}' \
+                -H "Content-Type: application/json" \
+                -d "{\"username\": \"${ADMIN_USER}\", \"password\": \"${ADMIN_PASS}\", \"email\": \"${ADMIN_EMAIL}\", \"access_token\": true}" \
+                "${QUAY_HOST}/api/v1/user/initialize")
+              HTTP_CODE=$(echo "${RESULT}" | tail -1)
+              BODY=$(echo "${RESULT}" | sed '$d')
+
+              if [ "${HTTP_CODE}" = "200" ]; then
+                echo "Admin user created successfully"
+              elif echo "${BODY}" | grep -q "already been initialized"; then
+                echo "Admin user already exists (OK)"
+              else
+                echo "WARNING: User init returned HTTP ${HTTP_CODE}"
+                echo "${BODY}"
+                echo "Continuing anyway - user may already exist"
+              fi

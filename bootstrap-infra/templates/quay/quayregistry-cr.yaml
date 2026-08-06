@@ -1,0 +1,31 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: lightwell
+  namespace: {{ .Values.quay.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  configBundleSecret: lightwell-quay-config
+  components:
+    - kind: clair
+      managed: true
+    - kind: postgres
+      managed: true
+    - kind: objectstorage
+      managed: true
+    - kind: redis
+      managed: true
+    - kind: horizontalpodautoscaler
+      managed: false
+    - kind: route
+      managed: true
+    - kind: mirror
+      managed: false
+    - kind: monitoring
+      managed: false
+    - kind: tls
+      managed: true
+    - kind: clairpostgres
+      managed: true

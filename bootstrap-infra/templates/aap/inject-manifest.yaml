@@ -66,7 +66,7 @@ spec:
               CONTROLLER_HOST=""
               for i in $(seq 1 60); do
                 ROUTE_HOST=$(oc get route -n "${NAMESPACE}" \
-                  -l app.kubernetes.io/component=controller \
+                  -l app.kubernetes.io/component=automationcontroller \
                   -o jsonpath='{.items[0].spec.host}' 2>/dev/null)
                 if [ -n "${ROUTE_HOST}" ]; then
                   CONTROLLER_HOST="https://${ROUTE_HOST}"

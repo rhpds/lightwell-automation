@@ -7,10 +7,9 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: sonarqube-privileged
-  namespace: {{ .Values.sonarqube.namespace }}
+  name: system:openshift:scc:privileged-sonarqube
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 subjects:

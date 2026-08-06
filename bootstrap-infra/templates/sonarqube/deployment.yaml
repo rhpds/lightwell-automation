@@ -27,6 +27,17 @@ spec:
               sysctl -w fs.file-max=131072
           securityContext:
             privileged: true
+        - name: volume-permissions
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - chown -R 1000:0 /opt/sonarqube/data
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: sonarqube-data
+              mountPath: /opt/sonarqube/data
       containers:
         - name: sonarqube
           image: {{ .Values.sonarqube.image }}
